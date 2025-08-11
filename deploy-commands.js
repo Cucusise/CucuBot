@@ -1,61 +1,40 @@
-const { REST, Routes, SlashCommandBuilder } = require('discord.js');
+require('dotenv').config(); // Carga las variables del archivo .env
+const { REST, Routes } = require('discord.js');
+const fs = require('node:fs');
+const path = require('node:path');
 
-const TOKEN = process.env.BOT_TOKEN || 'MTQwNDI0MjU2MjMxNDkyODIxMA.GkVyjH.iY1nLFb-RvKyXcj_5LJcO6l5rMX_JNKDmCorHM';
-const CLIENT_ID = '1404242562314928210';
+// Cargar comandos
+const commands = [];
+const foldersPath = path.join(__dirname, 'commands');
+const commandFolders = fs.readdirSync(foldersPath);
 
-const commands = [
-    new SlashCommandBuilder()
-        .setName('createvoice')
-        .setDescription('Crea un canal de voz temporal')
-        .addIntegerOption(option =>
-            option.setName('maxusers')
-                .setDescription('Número máximo de personas (2-99)')
-                .setRequired(true)
-                .setMinValue(2)
-                .setMaxValue(99)
-        )
-        .toJSON(),
+for (const folder of commandFolders) {
+    const commandsPath = path.join(foldersPath, folder);
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const filePath = path.join(commandsPath, file);
+        const command = require(filePath);
+        if ('data' in command && 'execute' in command) {
+            commands.push(command.data.toJSON());
+        } else {
+            console.log(`[ADVERTENCIA] El comando en ${filePath} no tiene "data" o "execute".`);
+        }
+    }
+}
 
-    new SlashCommandBuilder()
-        .setName('modifyvoice')
-        .setDescription('Modifica el canal de voz temporal que has creado')
-        .addStringOption(option =>
-            option.setName('name')
-                .setDescription('Nuevo nombre para el canal')
-                .setRequired(false)
-        )
-        .addIntegerOption(option =>
-            option.setName('maxusers')
-                .setDescription('Nuevo límite máximo de usuarios (2-99)')
-                .setRequired(false)
-                .setMinValue(2)
-                .setMaxValue(99)
-        )
-        .toJSON(),
-
-    new SlashCommandBuilder()
-        .setName('setvoicecategory')
-        .setDescription('Selecciona la categoría donde se crearán los canales de voz temporales')
-        .addChannelOption(option =>
-            option.setName('category')
-                .setDescription('Categoría para los canales de voz')
-                .setRequired(true)
-                .addChannelTypes(4) // SOLO categorías
-        )
-        .toJSON()
-];
-
-const rest = new REST({ version: '10' }).setToken(TOKEN);
+// Registrar comandos
+const rest = new REST().setToken(process.env.TOKEN);
 
 (async () => {
     try {
-        console.log('🚀 Registrando comandos globales...');
+        console.log(`Iniciando recarga de ${commands.length} comandos de aplicación.`);
+
         await rest.put(
-            Routes.applicationCommands(CLIENT_ID),
-            { body: commands }
+            Routes.applicationCommands(process.env.CLIENT_ID),
+            { body: commands },
         );
-        console.log('✅ Comandos globales registrados correctamente.');
-        console.log('⏳ Puede tardar hasta 1 hora en propagarse en todos los servidores.');
+
+        console.log('Comandos recargados correctamente.');
     } catch (error) {
         console.error(error);
     }
